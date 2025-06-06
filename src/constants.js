@@ -324,6 +324,7 @@ export const OPENAI_KEYS = [
     'max_tokens',
     'n',
     'best_of',
+    'response_format',
 ];
 
 export const AVATAR_WIDTH = 512;

@@ -425,6 +425,18 @@ router.post('/generate', async function (request, response) {
     }
 });
 
+router.post('/summary', async function (request, response) {
+    if (!request.body) return response.sendStatus(400);
+
+    const summary = await fetch('http://localhost:8081/v1/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request.body),
+    }).then(res => res.json());
+
+    return response.send(summary);
+});
+
 const ollama = express.Router();
 
 ollama.post('/download', async function (request, response) {
