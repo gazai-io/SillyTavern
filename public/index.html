@@ -5729,6 +5729,13 @@
                     <div class="fa-fw fa-solid fa-circle-xmark dragClose" id="closeZoom"></div>
                 </div>
                 <div class="zoomed_avatar_container">
+                    <div style="position: absolute; top: 0; left: 0;">
+                        <button id="set_attraction_to_0_4">Set attraction to 0.4</button>
+                        <button id="set_attraction_to_0_8">Set attraction to 0.8</button>
+                        <button id="set_attraction_to_1">Set attraction to 1</button>
+                    </div>
+                    <h4 id="relationship_summary" style="position: absolute; top: 50px;"></h4>
+
                     <img class="zoomed_avatar_img" src="" data-izoomify-url="" data-izoomify-magnify="1.8" data-izoomify-duration="300" alt="">
                 </div>
             </div>
@@ -5888,6 +5895,86 @@
                 <textarea id="personality_textarea" name="personality" data-i18n="[placeholder](A brief description of the personality)" placeholder="(A brief description of the personality)" form="form_create" class="text_pole" autocomplete="off" rows="4"></textarea>
                 <div class="extension_token_counter">
                     <span data-i18n="extension_token_counter">Tokens:</span> <span data-token-counter="personality_textarea" data-token-permanent="true">counting...</span>
+                </div>
+                
+                <!-- New Personality Settings -->
+                <div class="inline-drawer">
+                    <div class="inline-drawer-toggle inline-drawer-header">
+                        <b data-i18n="Advanced Personality Settings">Advanced Personality Settings</b>
+                        <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+                    </div>
+                    <div class="inline-drawer-content">
+                        <div class="flex-container flexFlowColumn gap5">
+                            <div class="flex-container flexFlowColumn">
+                                <label for="relationship_status" class="margin-bot-5">
+                                    <span data-i18n="Relationship Status">Relationship Status</span>
+                                </label>
+                                <div class="relationship-description" id="relationship_description">
+                                    <div class="relationship-slot" data-value="0.1">
+                                        <input class="text_pole textarea_compact m-t-0" type="number" min="0" max="1" step="0.1" value="0.1">
+                                        <textarea class="relationship-description" data-value="0.1" rows="2">あなたのことを「面白くて便利な人」と思っていますが、まだ友達としての関係で、会話には少し距離を感じています。</textarea>
+                                    </div>
+                                    <div class="relationship-slot" data-value="0.7">
+                                        <input class="text_pole textarea_compact m-t-0" type="number" min="0" max="1" step="0.1" value="0.7">
+                                        <textarea class="relationship-description" data-value="0.7" rows="2">あなたに好意はありますが、まだその感情を表に出すことにはためらいがあります。知り合い同士としての距離感を保ちたいと感じています。</textarea>
+                                    </div>
+                                    <div class="relationship-slot" data-value="1">
+                                        <input class="text_pole textarea_compact m-t-0" type="number" min="0" max="1" step="0.1" value="1">
+                                        <textarea class="relationship-description" data-value="1" rows="2">気持ちがはっきりしていて、自分から想いを伝えたいと思っています。あなたとのやりとりはとても親しく、心を開いています。</textarea>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex-container flexFlowColumn">
+                                <label for="personality_format" class="margin-bot-5">
+                                    <span data-i18n="Personality Format">Personality Format</span>
+                                </label>
+                                <select id="personality_format" class="text_pole">
+                                    <option value="0" data-i18n="Simple">Simple</option>
+                                    <option value="1" data-i18n="Detailed">Detailed</option>
+                                    <option value="2" data-i18n="Structured">Structured</option>
+                                </select>
+                            </div>
+                            
+                            <div class="flex-container flexFlowColumn">
+                                <label for="personality_sections" class="margin-bot-5">
+                                    <span data-i18n="Personality Sections">Personality Sections</span>
+                                </label>
+                                <div class="flex-container flexFlowColumn gap5">
+                                    <label class="checkbox_label">
+                                        <input type="checkbox" id="personality_traits" checked>
+                                        <span data-i18n="Traits">Traits</span>
+                                    </label>
+                                    <label class="checkbox_label">
+                                        <input type="checkbox" id="personality_background" checked>
+                                        <span data-i18n="Background">Background</span>
+                                    </label>
+                                    <label class="checkbox_label">
+                                        <input type="checkbox" id="personality_goals" checked>
+                                        <span data-i18n="Goals">Goals</span>
+                                    </label>
+                                    <label class="checkbox_label">
+                                        <input type="checkbox" id="personality_relationships" checked>
+                                        <span data-i18n="Relationships">Relationships</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="flex-container flexFlowColumn">
+                                <label for="personality_depth" class="margin-bot-5">
+                                    <span data-i18n="Personality Depth">Personality Depth</span>
+                                </label>
+                                <div class="range-block-range-and-counter">
+                                    <div class="range-block-range">
+                                        <input type="range" id="personality_depth" min="1" max="5" step="1" value="3">
+                                    </div>
+                                    <div class="range-block-counter">
+                                        <input type="number" id="personality_depth_counter" min="1" max="5" step="1" value="3">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div id="scenario_div">

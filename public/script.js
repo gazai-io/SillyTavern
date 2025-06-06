@@ -302,6 +302,17 @@ export {
     renderTemplate,
 };
 
+const relationshipStatus = {
+    closeness: 0,
+    prevAttraction: 0,
+    attraction: 0,
+    respect: 0,
+    harmony: 0,
+    commitment: 0,
+    show_summary: 0,
+    summary_text: '',
+}
+
 /**
  * Wait for page to load before continuing the app initialization.
  */
@@ -4765,12 +4776,43 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
             // add chat preamble
             mesSendString = addChatsPreamble(mesSendString);
 
+            const relationshipDescriptionSettings = $('#relationship_description textarea').get().map(function(dom) {
+                const value = $(dom).attr('data-value');
+                const description = $(dom).val();
+                return { value, description };
+            });
+
+            let relationshipDescriptions = '';
+            if (relationshipDescriptionSettings.length > 0) {
+                const attraction = relationshipStatus.attraction || 0;
+                const matchedDescription = relationshipDescriptionSettings.find((setting, index) => {
+                    const value = parseFloat(setting.value);
+                    const nextValue = index < relationshipDescriptionSettings.length - 1 
+                        ? parseFloat(relationshipDescriptionSettings[index + 1].value)
+                        : 2;
+                    return attraction >= value && attraction < nextValue;
+                });
+
+                if (matchedDescription) {
+                    relationshipDescriptions = matchedDescription.description;
+                }
+            }
+
             let combinedPrompt = beforeScenarioAnchor +
+                relationshipDescriptions +
                 storyString +
                 afterScenarioAnchor +
                 mesExmString +
                 mesSendString +
                 generatedPromptCache;
+
+            console.log('🔴🔴🔴🔴, combinedPrompt: ', combinedPrompt)
+            console.log('🔴🟢🟢🟢, beforeScenarioAnchor: ', beforeScenarioAnchor)
+            console.log('🔴🟢🟢🟢, storyString: ', storyString)
+            console.log('🔴🟢🟢🟢, afterScenarioAnchor: ', afterScenarioAnchor)
+            console.log('🔴🟢🟢🟢, mesExmString: ', mesExmString)
+            console.log('🔴🟢🟢🟢, mesSendString: ', mesSendString)
+            console.log('🔴🟢🟢🟢, generatedPromptCache: ', generatedPromptCache)
 
             combinedPrompt = combinedPrompt.replace(/\r/gm, '');
 
@@ -5023,7 +5065,40 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
                 });
             }
         } else {
-            return await sendGenerationRequest(type, generate_data);
+            const response = await sendGenerationRequest(type, generate_data);
+            console.log('🔴🔴🔴🔴', response)
+
+            const summaryData = {
+                ...generate_data,
+                prompt: [
+                    'Return the relationship state of the conversation in score between 0 to 1, and a summary of the conversation in Japanese, decide whether to show the summary or not based on the conversation is almost stucked of something happened',
+                    ...generate_data.prompt.split('\n').slice(1),
+                    response.choices[0].text,
+                ].join('\n')
+            }
+
+            const summaryResponse = await sendSummaryRequest(type, summaryData);
+            relationshipStatus.closeness = summaryResponse.closeness;
+            relationshipStatus.prevAttraction = relationshipStatus.attraction;
+            relationshipStatus.attraction = summaryResponse.attraction;
+            relationshipStatus.respect = summaryResponse.respect;
+            relationshipStatus.harmony = summaryResponse.harmony;
+            relationshipStatus.commitment = summaryResponse.commitment;
+            relationshipStatus.show_summary = summaryResponse.show_summary;
+            relationshipStatus.summary_text = summaryResponse.summary_text;
+
+            if (Math.abs(relationshipStatus.prevAttraction - relationshipStatus.attraction) > 0.3) {
+                const lost = relationshipStatus.prevAttraction - relationshipStatus.attraction;
+                const hint = lost > 0 ? '親密度が大幅に低下しました...なんかやらかしたかも？' : '親密度が大幅に上昇しました。';
+
+                sendSystemMessage(
+                    system_message_types.GENERIC, 
+                    hint,
+                    { isSmallSys: true }
+                );
+            }
+
+            return response;
         }
     }
 
@@ -5154,6 +5229,28 @@ export async function Generate(type, { automatic_trigger, force_name2, quiet_pro
         if (type !== 'quiet') {
             triggerAutoContinue(messageChunk, isImpersonate);
         }
+
+        console.log('🔴🔴🟢🟢, getMessage: ', getMessage)
+        // console.log('🔴🔴🟢🟢, messageChunk: ', messageChunk)
+        console.log('🔴🔴🟢🟢, ====')
+        console.log('🔴🔴🟢🟢, reasoning: ', reasoning)
+        console.log('🔴🔴🟢🟢, imageUrl: ', imageUrl)
+        console.log('🔴🔴🟢🟢, beforeScenarioAnchor: ', beforeScenarioAnchor)
+        console.log('🔴🔴🟢🟢, storyString: ', storyString)
+        console.log('🔴🔴🟢🟢, afterScenarioAnchor: ', afterScenarioAnchor)
+        console.log('🔴🔴🟢🟢, mesExmString: ', mesExmString)
+        console.log('🔴🔴🟢🟢, mesSendString: ', mesSendString)
+        console.log('🔴🔴🟢🟢, generatedPromptCache: ', generatedPromptCache)
+
+        // After saveReply, show system message.
+        if (relationshipStatus.show_summary > 0.75) {
+            sendSystemMessage(
+                system_message_types.GENERIC, 
+                relationshipStatus.summary_text,
+                { isSmallSys: true }
+            );
+        }
+
 
         // Don't break the API chain that expects a single string in return
         return Object.defineProperty(new String(getMessage), 'messageChunk', { value: messageChunk });
@@ -5873,6 +5970,40 @@ export async function sendGenerationRequest(type, data) {
     }
 
     const response = await fetch(getGenerateUrl(main_api), {
+        method: 'POST',
+        headers: getRequestHeaders(),
+        cache: 'no-cache',
+        body: JSON.stringify(data),
+        signal: abortController.signal,
+    });
+
+    if (!response.ok) {
+        throw await response.json();
+    }
+
+    return await response.json();
+}
+
+/**
+ * Sends a non-streaming request to the API.
+ * @param {string} type Generation type
+ * @param {object} data Generation data
+ * @returns {Promise<object>} Response data from the API
+ * @throws {Error|object}
+ */
+export async function sendSummaryRequest(type, data) {
+    if (main_api === 'openai') {
+        return await sendOpenAIRequest(type, data.prompt, abortController.signal);
+    }
+
+    if (main_api === 'koboldhorde') {
+        return await generateHorde(data.prompt, data, abortController.signal, true);
+    }
+
+    console.log('🔴🔴🔴🔴, data: ', data)
+    console.log('🔴🔴🔴🔴, getGenerateUrl(main_api): ', getGenerateUrl(main_api))
+
+    const response = await fetch("/api/backends/text-completions/summary", {
         method: 'POST',
         headers: getRequestHeaders(),
         cache: 'no-cache',
@@ -8268,6 +8399,13 @@ export function select_selected_character(chid, { switchMenu = true } = {}) {
     $('#creator_textarea').val(characters[chid].data?.creator);
     $('#character_version_textarea').val(characters[chid].data?.character_version || '');
     $('#personality_textarea').val(characters[chid].personality);
+    // $('#relationship_description textarea').get().forEach(function(dom) {
+    //     const value = $(dom).attr('data-value');
+    //     const descriptions = characters[chid].data['relationship_descriptions'] ?? [];
+    //     $(dom).val();
+        
+    //     characters[chid].data['relationship_descriptions'].append({  })
+    // }).get();
     $('#firstmessage_textarea').val(characters[chid].first_mes);
     $('#scenario_pole').val(characters[chid].scenario);
     $('#depth_prompt_prompt').val(characters[chid].data?.extensions?.depth_prompt?.prompt ?? '');
@@ -12025,6 +12163,127 @@ jQuery(async function () {
             newElement.attr('id', `zoomFor_${charname}`);
             newElement.addClass('draggable');
             newElement.find('.drag-grabber').attr('id', `zoomFor_${charname}header`);
+
+            const relationshipDescriptionSettings = $('#relationship_description textarea').get().map(function(dom) {
+                const value = $(dom).attr('data-value');
+                const description = $(dom).val();
+                return { value, description };
+            });
+
+            let relationshipDescriptions = '';
+            if (relationshipDescriptionSettings.length > 0) {
+                const attraction = relationshipStatus.attraction || 0;
+                const matchedDescription = relationshipDescriptionSettings.find((setting, index) => {
+                    const value = parseFloat(setting.value);
+                    const nextValue = index < relationshipDescriptionSettings.length - 1 
+                        ? parseFloat(relationshipDescriptionSettings[index + 1].value)
+                        : 1;
+                    return attraction >= value && attraction < nextValue;
+                });
+
+                if (matchedDescription) {
+                    relationshipDescriptions = matchedDescription.description;
+                }
+            }
+
+            newElement.find('#relationship_summary').text(JSON.stringify({ ...relationshipStatus, applied_description: relationshipDescriptions }, null, 2));
+
+            $('body').on('click', '#set_attraction_to_0_4', () => {
+                console.log('===== 0.4');
+                relationshipStatus.prevAttraction = relationshipStatus.attraction;
+                relationshipStatus.attraction = 0.4;
+                if (Math.abs(relationshipStatus.prevAttraction - relationshipStatus.attraction) > 0.3) {
+                    const lost = relationshipStatus.prevAttraction - relationshipStatus.attraction;
+                    const hint = lost > 0 ? '親密度が大幅に低下しました...なんかやらかしたかも？' : '親密度が大幅に上昇しました。';
+    
+                    sendSystemMessage(
+                        system_message_types.GENERIC, 
+                        hint,
+                        { isSmallSys: true }
+                    );
+                }
+                console.log(relationshipStatus, relationshipDescriptionSettings);
+                let relationshipDescriptions = '';
+                if (relationshipDescriptionSettings.length > 0) {
+                    const attraction = relationshipStatus.attraction || 0;
+                    const matchedDescription = relationshipDescriptionSettings.find((setting, index) => {
+                        const value = parseFloat(setting.value);
+                        const nextValue = index < relationshipDescriptionSettings.length - 1 
+                            ? parseFloat(relationshipDescriptionSettings[index + 1].value)
+                            : 2;
+                        return attraction >= value && attraction < nextValue;
+                    });
+
+                    if (matchedDescription) {
+                        relationshipDescriptions = matchedDescription.description;
+                    }
+                }
+                newElement.find('#relationship_summary').text(JSON.stringify({ ...relationshipStatus, applied_description: relationshipDescriptions }, null, 2));
+            });
+            $('body').on('click', '#set_attraction_to_0_8', () => {
+                console.log('===== 0.8');
+                relationshipStatus.prevAttraction = relationshipStatus.attraction;
+                relationshipStatus.attraction = 0.8;
+                if (Math.abs(relationshipStatus.prevAttraction - relationshipStatus.attraction) > 0.3) {
+                    const lost = relationshipStatus.prevAttraction - relationshipStatus.attraction;
+                    const hint = lost > 0 ? '親密度が大幅に低下しました...なんかやらかしたかも？' : '親密度が大幅に上昇しました。';
+    
+                    sendSystemMessage(
+                        system_message_types.GENERIC, 
+                        hint,
+                        { isSmallSys: true }
+                    );
+                }
+                console.log(relationshipStatus);
+                let relationshipDescriptions = '';
+                if (relationshipDescriptionSettings.length > 0) {
+                    const attraction = relationshipStatus.attraction || 0;
+                    const matchedDescription = relationshipDescriptionSettings.find((setting, index) => {
+                        const value = parseFloat(setting.value);
+                        const nextValue = index < relationshipDescriptionSettings.length - 1 
+                            ? parseFloat(relationshipDescriptionSettings[index + 1].value)
+                            : 2;
+                        return attraction >= value && attraction < nextValue;
+                    });
+
+                    if (matchedDescription) {
+                        relationshipDescriptions = matchedDescription.description;
+                    }
+                }
+                newElement.find('#relationship_summary').text(JSON.stringify({ ...relationshipStatus, applied_description: relationshipDescriptions }, null, 2));
+            });
+            $('body').on('click', '#set_attraction_to_1', () => {
+                console.log('===== 1');
+                relationshipStatus.prevAttraction = relationshipStatus.attraction;
+                relationshipStatus.attraction = 1;
+                if (Math.abs(relationshipStatus.prevAttraction - relationshipStatus.attraction) > 0.3) {
+                    const lost = relationshipStatus.prevAttraction - relationshipStatus.attraction;
+                    const hint = lost > 0 ? '親密度が大幅に低下しました...なんかやらかしたかも？' : '親密度が大幅に上昇しました。';
+    
+                    sendSystemMessage(
+                        system_message_types.GENERIC, 
+                        hint,
+                        { isSmallSys: true }
+                    );
+                }
+                console.log(relationshipStatus);
+                let relationshipDescriptions = '';
+                if (relationshipDescriptionSettings.length > 0) {
+                    const attraction = relationshipStatus.attraction || 0;
+                    const matchedDescription = relationshipDescriptionSettings.find((setting, index) => {
+                        const value = parseFloat(setting.value);
+                        const nextValue = index < relationshipDescriptionSettings.length - 1 
+                            ? parseFloat(relationshipDescriptionSettings[index + 1].value)
+                            : 2;
+                        return attraction >= value && attraction < nextValue;
+                    });
+
+                    if (matchedDescription) {
+                        relationshipDescriptions = matchedDescription.description;
+                    }
+                }
+                newElement.find('#relationship_summary').text(JSON.stringify({ ...relationshipStatus, applied_description: relationshipDescriptions }, null, 2));
+            });
 
             $('body').append(newElement);
             newElement.fadeIn(animation_duration);
