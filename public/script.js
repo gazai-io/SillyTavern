@@ -5992,13 +5992,13 @@ export async function sendGenerationRequest(type, data) {
  * @throws {Error|object}
  */
 export async function sendSummaryRequest(type, data) {
-    if (main_api === 'openai') {
-        return await sendOpenAIRequest(type, data.prompt, abortController.signal);
-    }
+    // if (main_api === 'openai') {
+    //     return await sendOpenAIRequest(type, data.prompt, abortController.signal);
+    // }
 
-    if (main_api === 'koboldhorde') {
-        return await generateHorde(data.prompt, data, abortController.signal, true);
-    }
+    // if (main_api === 'koboldhorde') {
+    //     return await generateHorde(data.prompt, data, abortController.signal, true);
+    // }
 
     console.log('🔴🔴🔴🔴, data: ', data)
     console.log('🔴🔴🔴🔴, getGenerateUrl(main_api): ', getGenerateUrl(main_api))
